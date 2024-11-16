@@ -1,0 +1,66 @@
+name: Build Kotatogram
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    env:
+      TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
+      TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+
+    - name: Install CMake
+      uses: twilio/cmake-action@v1
+      with:
+        cmake-version: '3.21.0'
+
+    - name: Install Git
+      run: choco install git -y
+      shell: cmd
+
+    - name: Install Visual Studio Build Tools
+      uses: microsoft/setup-msbuild@v1
+
+    - name: Clone kotatogram-desktop
+      run: git clone --recursive https://github.com/kotatogram/kotatogram-desktop.git
+      shell: cmd
+
+    - name: Prepare libraries
+      run: kotatogram-desktop\Telegram\build\prepare\win.bat
+      shell: cmd
+
+    - name: Configure Build
+      run: |
+        cd kotatogram-desktop\Telegram
+        configure.bat x64 -D TDESKTOP_API_ID=%TELEGRAM_API_ID% -D TDESKTOP_API_HASH=%TELEGRAM_API_HASH%
+      shell: cmd
+
+    - name: Build Telegram (Debug)
+      run: |
+        cd kotatogram-desktop\out64
+        msbuild Telegram.sln /p:Configuration=Debug
+      shell: cmd
+
+    - name: Upload Build Artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: Kotatogram_Debug
+        path: kotatogram-desktop\out64\Debug\Kotatogram.exe
